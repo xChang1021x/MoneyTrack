@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -41,9 +42,9 @@ val PRESET_COLORS = listOf(
 fun CategoryScreen(factory: ViewModelFactory, onBack: () -> Unit) {
     val viewModel: CategoryViewModel = viewModel(factory = factory)
     val expenseCategories by viewModel.expenseCategories.collectAsStateWithLifecycle()
-    val incomeCategories by viewModel.incomeCategories.collectAsStateWithLifecycle()
+    val incomeCategories  by viewModel.incomeCategories.collectAsStateWithLifecycle()
 
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab  by remember { mutableIntStateOf(0) }
     var showAddDialog by remember { mutableStateOf(false) }
 
     if (showAddDialog) {
@@ -64,32 +65,99 @@ fun CategoryScreen(factory: ViewModelFactory, onBack: () -> Unit) {
                 title = { Text("分类管理") },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, "添加分类")
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, "添加分类",
+                    tint = MaterialTheme.colorScheme.onPrimary)
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            TabRow(selectedTabIndex = selectedTab) {
-                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("支出分类") })
-                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("收入分类") })
-            }
-            val currentList = if (selectedTab == 0) expenseCategories else incomeCategories
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+
+            // ── 标签页切换 ─────────────────────────────────────────
+            Surface(
+                color = MaterialTheme.colorScheme.background,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                items(currentList, key = { it.id }) { cat ->
-                    CategoryRow(category = cat, onDelete = { viewModel.deleteCategory(cat) })
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor   = MaterialTheme.colorScheme.background,
+                    contentColor     = MaterialTheme.colorScheme.primary
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick  = { selectedTab = 0 },
+                        text     = { Text("支出分类") }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick  = { selectedTab = 1 },
+                        text     = { Text("收入分类") }
+                    )
+                }
+            }
+
+            val currentList = if (selectedTab == 0) expenseCategories else incomeCategories
+
+            if (currentList.isEmpty()) {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("暂无分类，点击 + 添加",
+                        color = MaterialTheme.colorScheme.outline,
+                        style = MaterialTheme.typography.bodyMedium)
+                }
+            } else {
+                // 所有分类放入一个圆角 Card
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            elevation = CardDefaults.cardElevation(0.dp)
+                        ) {
+                            Column(Modifier.padding(vertical = 4.dp)) {
+                                currentList.forEachIndexed { index, cat ->
+                                    CategoryRow(
+                                        category = cat,
+                                        onDelete = { viewModel.deleteCategory(cat) }
+                                    )
+                                    if (index < currentList.lastIndex) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(start = 68.dp, end = 16.dp),
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                            thickness = 0.5.dp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    item { Spacer(Modifier.height(80.dp)) }
                 }
             }
         }
     }
 }
+
+// ─── 分类条目行 ────────────────────────────────────────────────────────────
 
 @Composable
 fun CategoryRow(category: Category, onDelete: () -> Unit) {
@@ -99,7 +167,7 @@ fun CategoryRow(category: Category, onDelete: () -> Unit) {
         AlertDialog(
             onDismissRequest = { showConfirm = false },
             title = { Text("删除分类") },
-            text = { Text("确定要删除「${category.name}」吗？") },
+            text  = { Text("确定要删除「${category.name}」吗？") },
             confirmButton = {
                 TextButton(onClick = { onDelete(); showConfirm = false }) {
                     Text("删除", color = MaterialTheme.colorScheme.error)
@@ -110,27 +178,56 @@ fun CategoryRow(category: Category, onDelete: () -> Unit) {
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // 分类色块
         Box(
-            modifier = Modifier.size(40.dp).clip(CircleShape)
-                .background(Color(category.color).copy(alpha = 0.2f)),
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color(category.color).copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
-            Text(category.name.take(1), color = Color(category.color), fontWeight = FontWeight.Bold)
+            Text(
+                category.name.take(1),
+                color = Color(category.color),
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleSmall
+            )
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(category.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Spacer(modifier = Modifier.width(14.dp))
+        Text(
+            category.name,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium
+        )
         if (category.isDefault) {
-            Text("预置", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Text(
+                    "预置",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
         } else {
             IconButton(onClick = { showConfirm = true }) {
-                Icon(Icons.Default.Delete, "删除", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Delete, "删除",
+                    Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.error)
             }
         }
     }
 }
+
+// ─── 添加分类弹窗 ──────────────────────────────────────────────────────────
 
 @Composable
 fun AddCategoryDialog(
@@ -138,13 +235,15 @@ fun AddCategoryDialog(
     onConfirm: (String, Long) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var selectedColor by remember { mutableLongStateOf(PRESET_COLORS.first()) }
-    var nameError by remember { mutableStateOf(false) }
+    var name           by remember { mutableStateOf("") }
+    var selectedColor  by remember { mutableLongStateOf(PRESET_COLORS.first()) }
+    var nameError      by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("添加${if (type == TransactionType.EXPENSE) "支出" else "收入"}分类") },
+        title = {
+            Text("添加${if (type == TransactionType.EXPENSE) "支出" else "收入"}分类")
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
@@ -154,14 +253,16 @@ fun AddCategoryDialog(
                     isError = nameError,
                     supportingText = if (nameError) {{ Text("请输入分类名称") }} else null,
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
-                Text("选择颜色", style = MaterialTheme.typography.labelMedium)
+                Text("选择颜色", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(8),
                     modifier = Modifier.height(80.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement   = Arrangement.spacedBy(6.dp)
                 ) {
                     items(PRESET_COLORS) { color ->
                         Box(

@@ -44,10 +44,9 @@ fun AddTransactionScreen(factory: ViewModelFactory, onBack: () -> Unit) {
     var categoryError by remember { mutableStateOf(false) }
 
     val expenseCategories by viewModel.expenseCategories.collectAsStateWithLifecycle()
-    val incomeCategories by viewModel.incomeCategories.collectAsStateWithLifecycle()
+    val incomeCategories  by viewModel.incomeCategories.collectAsStateWithLifecycle()
     val categories = if (selectedType == TransactionType.EXPENSE) expenseCategories else incomeCategories
 
-    // 切换类型时重置分类选择
     LaunchedEffect(selectedType) { selectedCategoryId = null }
 
     if (showDatePicker) {
@@ -68,94 +67,150 @@ fun AddTransactionScreen(factory: ViewModelFactory, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("记一笔") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") } }
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 收入/支出切换
-            Row(modifier = Modifier.fillMaxWidth()) {
-                TabRow(selectedTabIndex = if (selectedType == TransactionType.EXPENSE) 0 else 1) {
-                    Tab(
-                        selected = selectedType == TransactionType.EXPENSE,
-                        onClick = { selectedType = TransactionType.EXPENSE },
-                        text = { Text("支出") }
-                    )
-                    Tab(
-                        selected = selectedType == TransactionType.INCOME,
-                        onClick = { selectedType = TransactionType.INCOME },
-                        text = { Text("收入") }
-                    )
+            Spacer(Modifier.height(4.dp))
+
+            // ── 收入 / 支出切换（Pill 样式）────────────────────────
+            Surface(
+                shape = RoundedCornerShape(50.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(Modifier.fillMaxWidth().padding(4.dp)) {
+                    listOf(TransactionType.EXPENSE to "支出", TransactionType.INCOME to "收入")
+                        .forEach { (type, label) ->
+                            val isSelected = selectedType == type
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(46.dp))
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                        else Color.Transparent
+                                    )
+                                    .clickable { selectedType = type }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                 }
             }
 
-            // 金额输入
+            // ── 金额输入 ───────────────────────────────────────────
             OutlinedTextField(
                 value = amountText,
-                onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' }; amountError = false },
+                onValueChange = {
+                    amountText = it.filter { c -> c.isDigit() || c == '.' }
+                    amountError = false
+                },
                 label = { Text("金额") },
-                prefix = { Text("¥") },
+                prefix = { Text("¥", style = MaterialTheme.typography.titleMedium) },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 isError = amountError,
                 supportingText = if (amountError) {{ Text("请输入有效金额") }} else null,
-                singleLine = true
+                singleLine = true,
+                textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                shape = RoundedCornerShape(16.dp)
             )
 
-            // 日期选择
+            // ── 日期选择 ───────────────────────────────────────────
             OutlinedTextField(
                 value = formatDateFull(selectedDate),
                 onValueChange = {},
                 label = { Text("日期") },
                 modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
                 enabled = false,
-                trailingIcon = { Icon(Icons.Default.DateRange, "选择日期") },
+                trailingIcon = {
+                    Icon(Icons.Default.DateRange, "选择日期",
+                        tint = MaterialTheme.colorScheme.primary)
+                },
+                shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor = MaterialTheme.colorScheme.outline,
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    disabledBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledTrailingIconColor = MaterialTheme.colorScheme.primary
                 )
             )
 
-            // 分类选择
-            Text(
-                "选择分类",
-                style = MaterialTheme.typography.labelLarge,
-                color = if (categoryError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-            )
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // ── 分类选择 ───────────────────────────────────────────
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                elevation = CardDefaults.cardElevation(0.dp)
             ) {
-                items(categories, key = { it.id }) { cat ->
-                    CategoryChip(
-                        category = cat,
-                        isSelected = selectedCategoryId == cat.id,
-                        onClick = { selectedCategoryId = cat.id; categoryError = false }
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "选择分类",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (categoryError) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 210.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(categories, key = { it.id }) { cat ->
+                            CategoryChip(
+                                category = cat,
+                                isSelected = selectedCategoryId == cat.id,
+                                onClick = { selectedCategoryId = cat.id; categoryError = false }
+                            )
+                        }
+                    }
+                    if (categoryError) {
+                        Text(
+                            "请选择分类",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
 
-            // 备注
+            // ── 备注 ───────────────────────────────────────────────
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
                 label = { Text("备注（可选）") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp)
             )
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // 保存按钮
+            // ── 保存按钮 ───────────────────────────────────────────
             Button(
                 onClick = {
                     val amount = amountText.toDoubleOrNull()
@@ -170,13 +225,19 @@ fun AddTransactionScreen(factory: ViewModelFactory, onBack: () -> Unit) {
                         onSuccess = onBack
                     )
                 },
-                modifier = Modifier.fillMaxWidth().height(52.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Text("保存", style = MaterialTheme.typography.titleMedium)
+                Text("保存", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
+
+// ─── 分类图标圆片 ──────────────────────────────────────────────────────────
 
 @Composable
 fun CategoryChip(category: Category, isSelected: Boolean, onClick: () -> Unit) {
@@ -202,7 +263,8 @@ fun CategoryChip(category: Category, isSelected: Boolean, onClick: () -> Unit) {
         Text(
             text = category.name,
             style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
+            maxLines = 1,
+            color = if (isSelected) catColor else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

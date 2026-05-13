@@ -2,7 +2,8 @@ package com.example.moneytrack.ui.search
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
@@ -25,9 +26,9 @@ import com.example.moneytrack.viewmodel.ViewModelFactory
 @Composable
 fun SearchScreen(factory: ViewModelFactory, onBack: () -> Unit) {
     val viewModel: SearchViewModel = viewModel(factory = factory)
-    val keyword by viewModel.keyword.collectAsStateWithLifecycle()
+    val keyword    by viewModel.keyword.collectAsStateWithLifecycle()
     val filterType by viewModel.filterType.collectAsStateWithLifecycle()
-    val results by viewModel.searchResults.collectAsStateWithLifecycle()
+    val results    by viewModel.searchResults.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -40,7 +41,10 @@ fun SearchScreen(factory: ViewModelFactory, onBack: () -> Unit) {
                         value = keyword,
                         onValueChange = viewModel::setKeyword,
                         placeholder = { Text("搜索备注关键字...") },
-                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, null,
+                                tint = MaterialTheme.colorScheme.primary)
+                        },
                         trailingIcon = {
                             if (keyword.isNotEmpty()) {
                                 IconButton(onClick = { viewModel.setKeyword("") }) {
@@ -49,48 +53,62 @@ fun SearchScreen(factory: ViewModelFactory, onBack: () -> Unit) {
                             }
                         },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                        shape = RoundedCornerShape(50.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                         )
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") }
-                }
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, "返回")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // 类型筛选 Chips
+
+            // ── 类型筛选 Chips ─────────────────────────────────────
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
                     selected = filterType == null,
-                    onClick = { viewModel.setFilterType(null) },
-                    label = { Text("全部") }
+                    onClick  = { viewModel.setFilterType(null) },
+                    label    = { Text("全部") }
                 )
                 FilterChip(
                     selected = filterType == TransactionType.EXPENSE,
-                    onClick = { viewModel.setFilterType(TransactionType.EXPENSE) },
-                    label = { Text("支出") }
+                    onClick  = { viewModel.setFilterType(TransactionType.EXPENSE) },
+                    label    = { Text("支出") }
                 )
                 FilterChip(
                     selected = filterType == TransactionType.INCOME,
-                    onClick = { viewModel.setFilterType(TransactionType.INCOME) },
-                    label = { Text("收入") }
+                    onClick  = { viewModel.setFilterType(TransactionType.INCOME) },
+                    label    = { Text("收入") }
                 )
             }
-            // 结果数
+
+            // ── 结果数 ─────────────────────────────────────────────
             Text(
                 text = "共 ${results.size} 条记录",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
+
             if (results.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -98,17 +116,40 @@ fun SearchScreen(factory: ViewModelFactory, onBack: () -> Unit) {
                 ) {
                     Text(
                         if (keyword.isBlank()) "输入关键字开始搜索" else "未找到相关账单",
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.outline,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
             } else {
+                // ── 搜索结果（统一放入一个圆角 Card）─────────────
                 LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
-                    items(results, key = { it.transaction.id }) { item ->
-                        TransactionItem(item = item)
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            elevation = CardDefaults.cardElevation(0.dp)
+                        ) {
+                            Column(Modifier.padding(vertical = 4.dp)) {
+                                results.forEachIndexed { index, item ->
+                                    TransactionItem(item = item)
+                                    if (index < results.lastIndex) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = 16.dp),
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                            thickness = 0.5.dp
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
+                    item { Spacer(Modifier.height(16.dp)) }
                 }
             }
         }

@@ -24,13 +24,12 @@ import com.example.moneytrack.data.model.Category
 import com.example.moneytrack.ui.common.formatAmount
 import com.example.moneytrack.viewmodel.BudgetViewModel
 import com.example.moneytrack.viewmodel.ViewModelFactory
-import kotlinx.coroutines.flow.Flow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetScreen(factory: ViewModelFactory, onBack: () -> Unit) {
     val viewModel: BudgetViewModel = viewModel(factory = factory)
-    val budgets by viewModel.budgets.collectAsStateWithLifecycle()
+    val budgets           by viewModel.budgets.collectAsStateWithLifecycle()
     val expenseCategories by viewModel.expenseCategories.collectAsStateWithLifecycle()
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -50,115 +49,171 @@ fun BudgetScreen(factory: ViewModelFactory, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("预算管理 · ${viewModel.currentYear}年${viewModel.currentMonth}月") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") } }
+                title = {
+                    Text("预算管理 · ${viewModel.currentYear}年${viewModel.currentMonth}月")
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, "设置预算")
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, "设置预算",
+                    tint = MaterialTheme.colorScheme.onPrimary)
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         if (budgets.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("暂未设置预算，点击 + 开始设置", color = MaterialTheme.colorScheme.outline)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("暂未设置预算",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.outline)
+                    Text("点击右下角 + 开始设置",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline)
+                }
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(budgets, key = { it.id }) { budget ->
-                    val category = expenseCategories.find { it.id == budget.categoryId }
+                    val category  = expenseCategories.find { it.id == budget.categoryId }
                     val spentFlow = viewModel.getSpentFlow(budget.categoryId)
                     val spent by spentFlow.collectAsStateWithLifecycle(initialValue = 0.0)
                     BudgetCard(
-                        budget = budget,
+                        budget   = budget,
                         category = category,
-                        spent = spent,
+                        spent    = spent,
                         onDelete = { viewModel.deleteBudget(budget) }
                     )
                 }
+                item { Spacer(Modifier.height(80.dp)) }
             }
         }
     }
 }
 
+// ─── 预算卡片 ──────────────────────────────────────────────────────────────
+
 @Composable
 fun BudgetCard(budget: Budget, category: Category?, spent: Double, onDelete: () -> Unit) {
-    val progress = if (budget.amount > 0) (spent / budget.amount).toFloat().coerceIn(0f, 1f) else 0f
+    val progress    = if (budget.amount > 0) (spent / budget.amount).toFloat().coerceIn(0f, 1f) else 0f
     val isOverBudget = spent > budget.amount
     val progressColor = when {
-        isOverBudget -> MaterialTheme.colorScheme.error
-        progress > 0.8f -> Color(0xFFFFA726)
-        else -> MaterialTheme.colorScheme.primary
+        isOverBudget   -> MaterialTheme.colorScheme.error
+        progress > 0.8f -> Color(0xFFFFA726)   // 橙色预警
+        else           -> MaterialTheme.colorScheme.primary
     }
+    val catColor = category?.let { Color(it.color) } ?: MaterialTheme.colorScheme.onSurface
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+
+            // 分类名 + 删除按钮
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = category?.name ?: "未知分类",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = category?.let { Color(it.color) } ?: MaterialTheme.colorScheme.onSurface
-                )
-                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Delete, "删除", tint = MaterialTheme.colorScheme.outline)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = catColor.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            category?.name?.take(1) ?: "?",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = catColor
+                        )
+                    }
+                    Text(
+                        category?.name ?: "未知分类",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = catColor
+                    )
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, "删除",
+                        Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.outline)
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+
+            // 进度条
             LinearProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(8.dp),
-                color = progressColor
+                modifier = Modifier.fillMaxWidth().height(6.dp),
+                color = progressColor,
+                trackColor = MaterialTheme.colorScheme.outlineVariant
             )
-            Spacer(modifier = Modifier.height(8.dp))
+
+            // 已用 / 预算
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "已用 ${formatAmount(spent)}",
+                    "已用 ${formatAmount(spent)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isOverBudget) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isOverBudget) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "预算 ${formatAmount(budget.amount)}",
+                    "预算 ${formatAmount(budget.amount)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )
             }
-            if (isOverBudget) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "⚠ 已超出预算 ${formatAmount(spent - budget.amount)}",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.labelSmall
-                )
-            } else {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "剩余 ${formatAmount(budget.amount - spent)}",
-                    color = MaterialTheme.colorScheme.outline,
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
+
+            // 超出 / 剩余提示
+            val statusText = if (isOverBudget)
+                "⚠ 已超出预算 ${formatAmount(spent - budget.amount)}"
+            else
+                "剩余 ${formatAmount(budget.amount - spent)}"
+
+            Text(
+                statusText,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isOverBudget) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.outline
+            )
         }
     }
 }
+
+// ─── 添加预算弹窗 ──────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,9 +225,9 @@ fun AddBudgetDialog(
 ) {
     val availableCategories = categories.filter { it.id !in existingBudgetCategoryIds }
     var selectedCategory by remember { mutableStateOf(availableCategories.firstOrNull()) }
-    var amountText by remember { mutableStateOf("") }
-    var amountError by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
+    var amountText       by remember { mutableStateOf("") }
+    var amountError      by remember { mutableStateOf(false) }
+    var expanded         by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -180,9 +235,9 @@ fun AddBudgetDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (availableCategories.isEmpty()) {
-                    Text("所有支出分类均已设置预算", color = MaterialTheme.colorScheme.outline)
+                    Text("所有支出分类均已设置预算",
+                        color = MaterialTheme.colorScheme.outline)
                 } else {
-                    // 分类下拉选择
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = !expanded }
@@ -192,8 +247,11 @@ fun AddBudgetDialog(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("分类") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                            },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
                         )
                         ExposedDropdownMenu(
                             expanded = expanded,
@@ -201,7 +259,7 @@ fun AddBudgetDialog(
                         ) {
                             availableCategories.forEach { cat ->
                                 DropdownMenuItem(
-                                    text = { Text(cat.name) },
+                                    text    = { Text(cat.name) },
                                     onClick = { selectedCategory = cat; expanded = false }
                                 )
                             }
@@ -209,14 +267,18 @@ fun AddBudgetDialog(
                     }
                     OutlinedTextField(
                         value = amountText,
-                        onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' }; amountError = false },
+                        onValueChange = {
+                            amountText = it.filter { c -> c.isDigit() || c == '.' }
+                            amountError = false
+                        },
                         label = { Text("月度预算金额") },
                         prefix = { Text("¥") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         isError = amountError,
                         supportingText = if (amountError) {{ Text("请输入有效金额") }} else null,
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
                     )
                 }
             }

@@ -37,8 +37,8 @@ fun SplitDetailScreen(
 
     LaunchedEffect(groupId) { vm.loadItems(groupId) }
 
-    val group   by vm.currentGroup.collectAsStateWithLifecycle()
-    val items   by vm.currentItems.collectAsStateWithLifecycle()
+    val group  by vm.currentGroup.collectAsStateWithLifecycle()
+    val items  by vm.currentItems.collectAsStateWithLifecycle()
 
     var showAddItemDialog by remember { mutableStateOf(false) }
     var showSettlement    by remember { mutableStateOf(false) }
@@ -56,60 +56,95 @@ fun SplitDetailScreen(
                 actions = {
                     if (items.isNotEmpty()) {
                         IconButton(onClick = { showSettlement = true }) {
-                            Icon(Icons.Default.Calculate, "查看结算")
+                            Icon(Icons.Default.Calculate, "查看结算",
+                                tint = MaterialTheme.colorScheme.primary)
                         }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddItemDialog = true }) {
-                Icon(Icons.Default.Add, "添加条目")
+            FloatingActionButton(
+                onClick = { showAddItemDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, "添加条目",
+                    tint = MaterialTheme.colorScheme.onPrimary)
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            // 汇总栏
+
+            // ── 合计汇总栏 ────────────────────────────────────────
             if (items.isNotEmpty()) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.fillMaxWidth()
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    elevation = CardDefaults.cardElevation(0.dp)
                 ) {
                     Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("共 ${items.size} 笔", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "共 ${items.size} 笔",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                         Text(
                             "合计 ¥%.2f".format(totalAmount),
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                        TextButton(onClick = { showSettlement = true }) { Text("结算") }
+                        TextButton(onClick = { showSettlement = true }) {
+                            Text("结算", color = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 }
             }
 
             if (items.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("暂无消费条目，点击 + 添加", color = MaterialTheme.colorScheme.outline)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("暂无消费条目",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.outline)
+                        Text("点击右下角 + 添加",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline)
+                    }
                 }
             } else {
                 LazyColumn(
                     Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(items, key = { it.id }) { item ->
                         SplitItemCard(item = item, onDelete = { vm.deleteItem(item) })
                     }
+                    item { Spacer(Modifier.height(80.dp)) }
                 }
             }
         }
     }
 
-    // 添加条目对话框（需要当前组对象才能弹出，避免空 participants）
     if (showAddItemDialog && group != null) {
         AddItemDialog(
             group = group!!,
@@ -122,7 +157,6 @@ fun SplitDetailScreen(
         )
     }
 
-    // 结算弹窗
     if (showSettlement) {
         if (settlement.isNotEmpty()) {
             SettlementDialog(settlement = settlement, onDismiss = { showSettlement = false })
@@ -130,8 +164,10 @@ fun SplitDetailScreen(
             AlertDialog(
                 onDismissRequest = { showSettlement = false },
                 title = { Text("结算结果") },
-                text = { Text("大家已各自均摊，无需额外转账 🎉") },
-                confirmButton = { TextButton(onClick = { showSettlement = false }) { Text("好的") } }
+                text  = { Text("大家已各自均摊，无需额外转账 🎉") },
+                confirmButton = {
+                    TextButton(onClick = { showSettlement = false }) { Text("好的") }
+                }
             )
         }
     }
@@ -141,10 +177,22 @@ fun SplitDetailScreen(
 
 @Composable
 private fun SplitItemCard(item: SplitItem, onDelete: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(item.itemName, style = MaterialTheme.typography.titleSmall)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(item.itemName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold)
                 Text(
                     "出资：${item.payer}",
                     style = MaterialTheme.typography.bodySmall,
@@ -153,13 +201,14 @@ private fun SplitItemCard(item: SplitItem, onDelete: () -> Unit) {
                 Text(
                     "参与：${item.participants.replace(",", "、")}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
                 "¥%.2f".format(item.price),
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(Modifier.width(4.dp))
             IconButton(onClick = onDelete) {
@@ -177,20 +226,17 @@ private fun SplitItemCard(item: SplitItem, onDelete: () -> Unit) {
 private fun AddItemDialog(
     group: SplitGroup,
     onDismiss: () -> Unit,
-    onAddParticipant: (String) -> Unit,   // 持久化新参与人到组
+    onAddParticipant: (String) -> Unit,
     onSave: (SplitItem) -> Unit
 ) {
-    // 从 group 读取参与人（函数每次 recompose 都会拿最新 group.participants）
     val groupParticipants = group.participants
         .split(",").map { it.trim() }.filter { it.isNotBlank() }
 
     var itemName  by remember { mutableStateOf("") }
     var priceText by remember { mutableStateOf("") }
-    var payer     by remember { mutableStateOf("") }          // 出资人（单选）
-    val selected  = remember { mutableStateListOf<String>() } // 参与人（多选）
-    var newName   by remember { mutableStateOf("") }          // 现场新增
-
-    // group 参与人变化时，如果 payer/selected 中有人不在新列表里也不影响（允许不在列表里的老数据）
+    var payer     by remember { mutableStateOf("") }
+    val selected  = remember { mutableStateListOf<String>() }
+    var newName   by remember { mutableStateOf("") }
 
     fun isValid() = itemName.isNotBlank() &&
             priceText.toDoubleOrNull() != null &&
@@ -205,46 +251,49 @@ private fun AddItemDialog(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // ── 基本信息 ──────────────────────────────
                 OutlinedTextField(
                     value = itemName,
                     onValueChange = { itemName = it },
                     label = { Text("商品 / 项目名称") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 OutlinedTextField(
                     value = priceText,
                     onValueChange = { priceText = it },
                     label = { Text("金额") },
+                    prefix = { Text("¥") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
 
-                // ── 出资人（卡片式单选）──────────────────
+                // 出资人（卡片式单选）
                 Text("出资人", style = MaterialTheme.typography.labelLarge)
                 if (groupParticipants.isEmpty()) {
-                    Text("请先在分账主页面添加参与人，或在下方现场添加",
+                    Text("请先在下方添加参与人",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline)
                 } else {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement   = Arrangement.spacedBy(8.dp)
                     ) {
                         groupParticipants.forEach { name ->
                             PayerCard(
-                                name = name,
+                                name     = name,
                                 selected = payer == name,
-                                onClick = { payer = if (payer == name) "" else name }
+                                onClick  = { payer = if (payer == name) "" else name }
                             )
                         }
                     }
                 }
 
-                // ── 参与人（芯片多选）────────────────────
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // 参与人（多选）
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -252,12 +301,10 @@ private fun AddItemDialog(
                 ) {
                     Text("参与人", style = MaterialTheme.typography.labelLarge)
                     if (groupParticipants.isNotEmpty()) {
-                        TextButton(
-                            onClick = {
-                                selected.clear()
-                                selected.addAll(groupParticipants)
-                            }
-                        ) { Text("全选") }
+                        TextButton(onClick = {
+                            selected.clear()
+                            selected.addAll(groupParticipants)
+                        }) { Text("全选") }
                     }
                 }
                 if (groupParticipants.isEmpty()) {
@@ -267,12 +314,12 @@ private fun AddItemDialog(
                 } else {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement   = Arrangement.spacedBy(6.dp)
                     ) {
                         groupParticipants.forEach { name ->
                             FilterChip(
                                 selected = name in selected,
-                                onClick = {
+                                onClick  = {
                                     if (name in selected) selected.remove(name)
                                     else selected.add(name)
                                 },
@@ -282,9 +329,11 @@ private fun AddItemDialog(
                     }
                 }
 
-                // ── 现场新增参与人（自动持久化到组）──────
-                HorizontalDivider()
-                Text("现场添加参与人", style = MaterialTheme.typography.labelMedium,
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // 现场新增参与人
+                Text("现场添加参与人",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline)
                 Row(
                     Modifier.fillMaxWidth(),
@@ -296,13 +345,14 @@ private fun AddItemDialog(
                         onValueChange = { newName = it },
                         label = { Text("姓名") },
                         singleLine = true,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
                     )
                     FilledTonalIconButton(
                         onClick = {
                             val n = newName.trim()
                             if (n.isNotBlank()) {
-                                onAddParticipant(n)   // 持久化到 split_group
+                                onAddParticipant(n)
                                 if (n !in selected) selected.add(n)
                                 newName = ""
                             }
@@ -317,10 +367,10 @@ private fun AddItemDialog(
                 onClick = {
                     onSave(
                         SplitItem(
-                            groupId = 0L,
-                            itemName = itemName.trim(),
-                            price = priceText.toDouble(),
-                            payer = payer,
+                            groupId      = 0L,
+                            itemName     = itemName.trim(),
+                            price        = priceText.toDouble(),
+                            payer        = payer,
                             participants = selected.joinToString(",")
                         )
                     )
@@ -336,20 +386,12 @@ private fun AddItemDialog(
 
 @Composable
 private fun PayerCard(name: String, selected: Boolean, onClick: () -> Unit) {
-    val containerColor = if (selected)
-        MaterialTheme.colorScheme.primaryContainer
-    else
-        MaterialTheme.colorScheme.surfaceVariant
-
-    val borderColor = if (selected)
-        MaterialTheme.colorScheme.primary
-    else
-        MaterialTheme.colorScheme.outlineVariant
-
-    val contentColor = if (selected)
-        MaterialTheme.colorScheme.onPrimaryContainer
-    else
-        MaterialTheme.colorScheme.onSurfaceVariant
+    val containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
+                         else MaterialTheme.colorScheme.surfaceVariant
+    val borderColor    = if (selected) MaterialTheme.colorScheme.primary
+                         else MaterialTheme.colorScheme.outlineVariant
+    val contentColor   = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                         else MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
         color = containerColor,
@@ -368,21 +410,12 @@ private fun PayerCard(name: String, selected: Boolean, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            if (selected) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-            } else {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
+            Icon(
+                if (selected) Icons.Default.CheckCircle else Icons.Default.Person,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else contentColor,
+                modifier = Modifier.size(16.dp)
+            )
             Text(
                 name,
                 style = MaterialTheme.typography.bodyMedium,
@@ -410,20 +443,22 @@ private fun SettlementDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 settlement.forEach { (from, to, amount) ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
-                        )
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        elevation = CardDefaults.cardElevation(0.dp)
                     ) {
                         Row(
                             Modifier.fillMaxWidth().padding(12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(from,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold)

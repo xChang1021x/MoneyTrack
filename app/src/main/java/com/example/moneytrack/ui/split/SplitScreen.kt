@@ -1,14 +1,18 @@
 package com.example.moneytrack.ui.split
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,12 +30,10 @@ fun SplitScreen(
 ) {
     val vm: SplitViewModel = viewModel(factory = factory)
     val groups by vm.allGroups.collectAsStateWithLifecycle()
-
     val historicalParticipants by vm.historicalParticipants.collectAsStateWithLifecycle()
 
     var showCreateDialog by remember { mutableStateOf(false) }
-    /** 当前正在管理参与人的组，非 null 时弹出管理弹窗 */
-    var managingGroup by remember { mutableStateOf<SplitGroup?>(null) }
+    var managingGroup   by remember { mutableStateOf<SplitGroup?>(null) }
 
     Scaffold(
         topBar = {
@@ -39,39 +41,60 @@ fun SplitScreen(
                 title = { Text("分账计算器") },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Default.Add, "新建分账")
+            FloatingActionButton(
+                onClick = { showCreateDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, "新建分账",
+                    tint = MaterialTheme.colorScheme.onPrimary)
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         if (groups.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("暂无分账记录，点击 + 新建", color = MaterialTheme.colorScheme.outline)
+            Box(
+                Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("暂无分账记录",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.outline)
+                    Text("点击右下角 + 新建",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline)
+                }
             }
         } else {
             LazyColumn(
                 Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(groups, key = { it.id }) { group ->
                     SplitGroupCard(
-                        group = group,
+                        group        = group,
                         participants = vm.participantList(group),
-                        onClick = { onOpenGroup(group.id) },
+                        onClick      = { onOpenGroup(group.id) },
                         onManageParticipants = { managingGroup = group },
-                        onDelete = { vm.deleteGroup(group) }
+                        onDelete     = { vm.deleteGroup(group) }
                     )
                 }
+                item { Spacer(Modifier.height(80.dp)) }
             }
         }
     }
 
-    // 新建分账对话框
     if (showCreateDialog) {
         CreateGroupDialog(
             historicalParticipants = historicalParticipants,
@@ -79,9 +102,9 @@ fun SplitScreen(
             onSave = { title, note, initialParticipants ->
                 vm.addGroup(
                     SplitGroup(
-                        title = title,
-                        date = System.currentTimeMillis(),
-                        note = note,
+                        title        = title,
+                        date         = System.currentTimeMillis(),
+                        note         = note,
                         participants = initialParticipants.joinToString(",")
                     ),
                     onCreated = { id -> onOpenGroup(id) }
@@ -91,15 +114,14 @@ fun SplitScreen(
         )
     }
 
-    // 管理参与人弹窗（使用最新的 group 对象保证实时更新）
     managingGroup?.let { mg ->
         val latestGroup = groups.firstOrNull { it.id == mg.id } ?: mg
         ManageParticipantsDialog(
-            group = latestGroup,
+            group        = latestGroup,
             participants = vm.participantList(latestGroup),
-            onAdd = { vm.addParticipant(latestGroup, it) },
-            onRemove = { vm.removeParticipant(latestGroup, it) },
-            onDismiss = { managingGroup = null }
+            onAdd        = { vm.addParticipant(latestGroup, it) },
+            onRemove     = { vm.removeParticipant(latestGroup, it) },
+            onDismiss    = { managingGroup = null }
         )
     }
 }
@@ -115,28 +137,45 @@ private fun SplitGroupCard(
     onManageParticipants: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // 标题行
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick  = onClick,
+        shape    = RoundedCornerShape(20.dp),
+        colors   = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // 标题 + 操作按钮行
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(group.title, style = MaterialTheme.typography.titleMedium)
-                    Text(formatDateFull(group.date), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        group.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        formatDateFull(group.date),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
                 }
-                // 管理参与人
                 IconButton(onClick = onManageParticipants) {
                     Icon(Icons.Default.GroupAdd, "管理参与人",
                         tint = MaterialTheme.colorScheme.primary)
                 }
-                // 删除
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
                 }
-                Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
+                Icon(Icons.Default.ChevronRight, null,
+                    tint = MaterialTheme.colorScheme.outlineVariant)
             }
 
-            // 参与人芯片行
+            // 参与人展示
             if (participants.isEmpty()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -151,19 +190,18 @@ private fun SplitGroupCard(
             } else {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement   = Arrangement.spacedBy(4.dp)
                 ) {
                     participants.forEach { name ->
                         SuggestionChip(
                             onClick = {},
-                            label = { Text(name, style = MaterialTheme.typography.labelSmall) }
+                            label   = { Text(name, style = MaterialTheme.typography.labelSmall) }
                         )
                     }
-                    // 提示可继续添加
                     AssistChip(
                         onClick = onManageParticipants,
-                        label = { Text("+", style = MaterialTheme.typography.labelSmall) },
-                        colors = AssistChipDefaults.assistChipColors(
+                        label   = { Text("+", style = MaterialTheme.typography.labelSmall) },
+                        colors  = AssistChipDefaults.assistChipColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer
                         )
                     )
@@ -173,7 +211,7 @@ private fun SplitGroupCard(
     }
 }
 
-// ─── 新建分账对话框（含初始参与人设置）────────────────────────────────────────
+// ─── 新建分账对话框 ────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -184,10 +222,9 @@ private fun CreateGroupDialog(
 ) {
     var title     by remember { mutableStateOf("") }
     var note      by remember { mutableStateOf("") }
-    val selected  = remember { mutableStateListOf<String>() }   // 本次已选参与人
+    val selected  = remember { mutableStateListOf<String>() }
     var inputName by remember { mutableStateOf("") }
 
-    // 历史参与人里未被选中的，作为"可选"候选
     val unselected = historicalParticipants.filter { it !in selected }
 
     AlertDialog(
@@ -198,25 +235,25 @@ private fun CreateGroupDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // ── 基本信息 ──────────────────────────────────
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text("分账名称（如：周末聚餐）") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
                     label = { Text("备注（选填）") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
 
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-                // ── 历史参与人快速选取 ────────────────────────
                 if (historicalParticipants.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(
@@ -224,11 +261,9 @@ private fun CreateGroupDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                "从历史参与人选取",
+                            Text("从历史参与人选取",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.outline
-                            )
+                                color = MaterialTheme.colorScheme.outline)
                             if (unselected.isNotEmpty()) {
                                 TextButton(
                                     onClick = { selected.addAll(unselected) },
@@ -238,13 +273,13 @@ private fun CreateGroupDialog(
                         }
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            verticalArrangement   = Arrangement.spacedBy(6.dp)
                         ) {
                             historicalParticipants.forEach { name ->
                                 val isSelected = name in selected
                                 FilterChip(
                                     selected = isSelected,
-                                    onClick = {
+                                    onClick  = {
                                         if (isSelected) selected.remove(name)
                                         else selected.add(name)
                                     },
@@ -258,7 +293,6 @@ private fun CreateGroupDialog(
                     }
                 }
 
-                // ── 手动输入新参与人 ──────────────────────────
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         if (historicalParticipants.isEmpty()) "添加参与人（选填，也可之后再加）"
@@ -276,7 +310,8 @@ private fun CreateGroupDialog(
                             onValueChange = { inputName = it },
                             label = { Text("姓名") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
                         )
                         FilledTonalIconButton(
                             onClick = {
@@ -289,17 +324,16 @@ private fun CreateGroupDialog(
                     }
                 }
 
-                // ── 已选列表预览 ──────────────────────────────
                 if (selected.isNotEmpty()) {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement   = Arrangement.spacedBy(4.dp)
                     ) {
                         selected.forEach { name ->
                             InputChip(
                                 selected = false,
-                                onClick = { selected.remove(name) },
-                                label = { Text(name) },
+                                onClick  = { selected.remove(name) },
+                                label    = { Text(name) },
                                 trailingIcon = {
                                     Icon(Icons.Default.Close, null, Modifier.size(14.dp))
                                 }
@@ -311,8 +345,8 @@ private fun CreateGroupDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(title.trim(), note.trim(), selected.toList()) },
-                enabled = title.isNotBlank()
+                onClick  = { onSave(title.trim(), note.trim(), selected.toList()) },
+                enabled  = title.isNotBlank()
             ) { Text("创建") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
@@ -334,40 +368,42 @@ private fun ManageParticipantsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("管理参与人 — ${group.title}") },
+        title = { Text("参与人 — ${group.title}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // 添加输入框
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     OutlinedTextField(
                         value = inputName,
                         onValueChange = { inputName = it },
                         label = { Text("添加参与人") },
                         singleLine = true,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
                     )
-                    FilledTonalIconButton(onClick = {
-                        onAdd(inputName.trim())
-                        inputName = ""
-                    }, enabled = inputName.isNotBlank()) {
-                        Icon(Icons.Default.Add, null)
-                    }
+                    FilledTonalIconButton(
+                        onClick = { onAdd(inputName.trim()); inputName = "" },
+                        enabled = inputName.isNotBlank()
+                    ) { Icon(Icons.Default.Add, null) }
                 }
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 if (participants.isEmpty()) {
-                    Text("暂无参与人", style = MaterialTheme.typography.bodySmall,
+                    Text("暂无参与人",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline)
                 } else {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement   = Arrangement.spacedBy(6.dp)
                     ) {
                         participants.forEach { name ->
                             InputChip(
                                 selected = false,
-                                onClick = { onRemove(name) },
-                                label = { Text(name) },
+                                onClick  = { onRemove(name) },
+                                label    = { Text(name) },
                                 trailingIcon = {
                                     Icon(Icons.Default.Close, "移除", Modifier.size(14.dp))
                                 }

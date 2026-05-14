@@ -71,11 +71,16 @@ interface TransactionDao {
 
     @RoomTransaction
     @Query("""
-        SELECT * FROM transactions
-        WHERE note LIKE '%' || :keyword || '%'
-        ORDER BY date DESC
+        SELECT t.* FROM transactions t
+        LEFT JOIN categories c ON t.categoryId = c.id
+        WHERE t.note LIKE '%' || :keyword || '%'
+           OR c.name LIKE '%' || :keyword || '%'
+        ORDER BY t.date DESC
     """)
     fun searchTransactions(keyword: String): Flow<List<TransactionWithCategory>>
+
+    @Query("SELECT * FROM transactions WHERE id = :id LIMIT 1")
+    suspend fun getTransactionById(id: Long): Transaction?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long

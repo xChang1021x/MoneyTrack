@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 @Database(
     entities = [Transaction::class, Category::class, Budget::class,
                 Debt::class, SplitGroup::class, SplitItem::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
     autoMigrations = [AutoMigration(from = 1, to = 2)]
 )
@@ -54,13 +54,22 @@ abstract class MoneyTrackDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 → v4：categories 新增 sortOrder 列 */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE categories ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
         private fun buildDatabase(context: Context): MoneyTrackDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
                 MoneyTrackDatabase::class.java,
                 "moneytrack.db"
             )
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
@@ -74,22 +83,22 @@ abstract class MoneyTrackDatabase : RoomDatabase() {
                 .build()
         }
 
-        // 预置分类
+        // 预置分类（sortOrder 按默认位置预设）
         val DEFAULT_CATEGORIES = listOf(
             // 支出分类
-            Category(name = "餐饮", icon = "restaurant", color = 0xFFEF5350, type = TransactionType.EXPENSE, isDefault = true),
-            Category(name = "交通", icon = "directions_car", color = 0xFF42A5F5, type = TransactionType.EXPENSE, isDefault = true),
-            Category(name = "购物", icon = "shopping_bag", color = 0xFFAB47BC, type = TransactionType.EXPENSE, isDefault = true),
-            Category(name = "娱乐", icon = "sports_esports", color = 0xFF26A69A, type = TransactionType.EXPENSE, isDefault = true),
-            Category(name = "居家", icon = "home", color = 0xFFFF7043, type = TransactionType.EXPENSE, isDefault = true),
-            Category(name = "医疗", icon = "local_hospital", color = 0xFF66BB6A, type = TransactionType.EXPENSE, isDefault = true),
-            Category(name = "教育", icon = "school", color = 0xFFFFCA28, type = TransactionType.EXPENSE, isDefault = true),
-            Category(name = "其他支出", icon = "more_horiz", color = 0xFF78909C, type = TransactionType.EXPENSE, isDefault = true),
+            Category(name = "餐饮",   icon = "restaurant",    color = 0xFFEF5350, type = TransactionType.EXPENSE, isDefault = true, sortOrder = 0),
+            Category(name = "交通",   icon = "directions_car", color = 0xFF42A5F5, type = TransactionType.EXPENSE, isDefault = true, sortOrder = 1),
+            Category(name = "购物",   icon = "shopping_bag",  color = 0xFFAB47BC, type = TransactionType.EXPENSE, isDefault = true, sortOrder = 2),
+            Category(name = "娱乐",   icon = "sports_esports", color = 0xFF26A69A, type = TransactionType.EXPENSE, isDefault = true, sortOrder = 3),
+            Category(name = "居家",   icon = "home",           color = 0xFFFF7043, type = TransactionType.EXPENSE, isDefault = true, sortOrder = 4),
+            Category(name = "医疗",   icon = "local_hospital", color = 0xFF66BB6A, type = TransactionType.EXPENSE, isDefault = true, sortOrder = 5),
+            Category(name = "教育",   icon = "school",         color = 0xFFFFCA28, type = TransactionType.EXPENSE, isDefault = true, sortOrder = 6),
+            Category(name = "其他支出", icon = "more_horiz",   color = 0xFF78909C, type = TransactionType.EXPENSE, isDefault = true, sortOrder = 7),
             // 收入分类
-            Category(name = "工资", icon = "payments", color = 0xFF4CAF50, type = TransactionType.INCOME, isDefault = true),
-            Category(name = "奖金", icon = "card_giftcard", color = 0xFFFFB300, type = TransactionType.INCOME, isDefault = true),
-            Category(name = "理财", icon = "trending_up", color = 0xFF29B6F6, type = TransactionType.INCOME, isDefault = true),
-            Category(name = "其他收入", icon = "more_horiz", color = 0xFF78909C, type = TransactionType.INCOME, isDefault = true),
+            Category(name = "工资",   icon = "payments",       color = 0xFF4CAF50, type = TransactionType.INCOME, isDefault = true, sortOrder = 0),
+            Category(name = "奖金",   icon = "card_giftcard",  color = 0xFFFFB300, type = TransactionType.INCOME, isDefault = true, sortOrder = 1),
+            Category(name = "理财",   icon = "trending_up",    color = 0xFF29B6F6, type = TransactionType.INCOME, isDefault = true, sortOrder = 2),
+            Category(name = "其他收入", icon = "more_horiz",   color = 0xFF78909C, type = TransactionType.INCOME, isDefault = true, sortOrder = 3),
         )
     }
 }

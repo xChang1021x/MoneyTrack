@@ -8,10 +8,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface CategoryDao {
 
-    @Query("SELECT * FROM categories ORDER BY name ASC")
+    @Query("SELECT * FROM categories ORDER BY sortOrder ASC, name ASC")
     fun getAllCategories(): Flow<List<Category>>
 
-    @Query("SELECT * FROM categories WHERE type = :type ORDER BY name ASC")
+    @Query("SELECT * FROM categories WHERE type = :type ORDER BY sortOrder ASC, name ASC")
     fun getCategoriesByType(type: TransactionType): Flow<List<Category>>
 
     @Query("SELECT * FROM categories WHERE id = :id")
@@ -25,6 +25,9 @@ interface CategoryDao {
 
     @Update
     suspend fun updateCategory(category: Category)
+
+    @Update
+    suspend fun updateCategories(categories: List<Category>)
 
     @Delete
     suspend fun deleteCategory(category: Category)

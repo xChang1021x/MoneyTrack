@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,26 +30,58 @@ import com.example.moneytrack.ui.common.formatDateFull
 import com.example.moneytrack.viewmodel.AddTransactionViewModel
 import com.example.moneytrack.viewmodel.ViewModelFactory
 
+/**
+ * 记账 / 修改账单一体化页面。
+ * transactionId == -1L → 新增模式；否则为编辑模式，自动从 DB 预填表单。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddTransactionScreen(factory: ViewModelFactory, onBack: () -> Unit) {
+fun AddTransactionScreen(
+    factory: ViewModelFactory,
+    transactionId: Long = -1L,
+    onBack: () -> Unit
+) {
     val viewModel: AddTransactionViewModel = viewModel(factory = factory)
+    val isEditMode = transactionId >= 0L
 
-    var selectedType by remember { mutableStateOf(TransactionType.EXPENSE) }
-    var amountText by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
+    // ── 表单状态 ─────────────────────────────────────────────────────────
+    var selectedType       by remember { mutableStateOf(TransactionType.EXPENSE) }
+    var amountText         by remember { mutableStateOf("") }
+    var note               by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
-    var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
-    var showDatePicker by remember { mutableStateOf(false) }
-    var amountError by remember { mutableStateOf(false) }
-    var categoryError by remember { mutableStateOf(false) }
+    var selectedDate       by remember { mutableStateOf(System.currentTimeMillis()) }
+    var showDatePicker     by remember { mutableStateOf(false) }
+    var amountError        by remember { mutableStateOf(false) }
+    var categoryError      by remember { mutableStateOf(false) }
+    var showDeleteConfirm  by remember { mutableStateOf(false) }
+
+    // 编辑模式：加载已有账单并预填（只做一次）
+    val loadedTransaction by viewModel.loadedTransaction.collectAsStateWithLifecycle()
+    var initialized        by remember { mutableStateOf(false) }
+
+    LaunchedEffect(transactionId) {
+        if (isEditMode) viewModel.loadTransaction(transactionId)
+    }
+
+    LaunchedEffect(loadedTransaction) {
+        if (isEditMode && !initialized && loadedTransaction != null) {
+            val t = loadedTransaction!!
+            selectedType       = t.type
+            amountText         = if (t.amount == t.amount.toLong().toDouble())
+                                     t.amount.toLong().toString()
+                                 else t.amount.toString()
+            note               = t.note
+            selectedDate       = t.date
+            selectedCategoryId = t.categoryId
+            initialized        = true
+        }
+    }
 
     val expenseCategories by viewModel.expenseCategories.collectAsStateWithLifecycle()
     val incomeCategories  by viewModel.incomeCategories.collectAsStateWithLifecycle()
     val categories = if (selectedType == TransactionType.EXPENSE) expenseCategories else incomeCategories
 
-    LaunchedEffect(selectedType) { selectedCategoryId = null }
-
+    // ── 日期选择器 ────────────────────────────────────────────────────────
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDate)
         DatePickerDialog(
@@ -63,12 +96,36 @@ fun AddTransactionScreen(factory: ViewModelFactory, onBack: () -> Unit) {
         ) { DatePicker(state = datePickerState) }
     }
 
+    // ── 删除确认弹窗 ──────────────────────────────────────────────────────
+    if (showDeleteConfirm && loadedTransaction != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除账单") },
+            text  = { Text("确定删除这条账单记录吗？此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteTransaction(loadedTransaction!!) { onBack() }
+                    showDeleteConfirm = false
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") } }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("记一笔") },
+                title = { Text(if (isEditMode) "修改记账" else "记一笔") },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") }
+                },
+                actions = {
+                    if (isEditMode) {
+                        IconButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(Icons.Default.Delete, "删除",
+                                tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
@@ -104,7 +161,12 @@ fun AddTransactionScreen(factory: ViewModelFactory, onBack: () -> Unit) {
                                         if (isSelected) MaterialTheme.colorScheme.primary
                                         else Color.Transparent
                                     )
-                                    .clickable { selectedType = type }
+                                    .clickable {
+                                        if (selectedType != type) {
+                                            selectedType = type
+                                            selectedCategoryId = null
+                                        }
+                                    }
                                     .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -151,9 +213,9 @@ fun AddTransactionScreen(factory: ViewModelFactory, onBack: () -> Unit) {
                 },
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledTextColor         = MaterialTheme.colorScheme.onSurface,
+                    disabledBorderColor       = MaterialTheme.colorScheme.outlineVariant,
+                    disabledLabelColor        = MaterialTheme.colorScheme.onSurfaceVariant,
                     disabledTrailingIconColor = MaterialTheme.colorScheme.primary
                 )
             )
@@ -182,18 +244,16 @@ fun AddTransactionScreen(factory: ViewModelFactory, onBack: () -> Unit) {
                     ) {
                         items(categories, key = { it.id }) { cat ->
                             CategoryChip(
-                                category = cat,
+                                category   = cat,
                                 isSelected = selectedCategoryId == cat.id,
-                                onClick = { selectedCategoryId = cat.id; categoryError = false }
+                                onClick    = { selectedCategoryId = cat.id; categoryError = false }
                             )
                         }
                     }
                     if (categoryError) {
-                        Text(
-                            "请选择分类",
+                        Text("请选择分类",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                            color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -210,27 +270,41 @@ fun AddTransactionScreen(factory: ViewModelFactory, onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ── 保存按钮 ───────────────────────────────────────────
+            // ── 保存 / 保存修改 按钮 ────────────────────────────────
             Button(
                 onClick = {
                     val amount = amountText.toDoubleOrNull()
                     if (amount == null || amount <= 0) { amountError = true; return@Button }
                     if (selectedCategoryId == null) { categoryError = true; return@Button }
-                    viewModel.saveTransaction(
-                        amount = amount,
-                        type = selectedType,
-                        categoryId = selectedCategoryId!!,
-                        note = note.trim(),
-                        date = selectedDate,
-                        onSuccess = onBack
-                    )
+                    if (isEditMode && loadedTransaction != null) {
+                        viewModel.updateTransaction(
+                            original   = loadedTransaction!!,
+                            amount     = amount,
+                            type       = selectedType,
+                            categoryId = selectedCategoryId!!,
+                            note       = note.trim(),
+                            date       = selectedDate,
+                            onSuccess  = onBack
+                        )
+                    } else {
+                        viewModel.saveTransaction(
+                            amount     = amount,
+                            type       = selectedType,
+                            categoryId = selectedCategoryId!!,
+                            note       = note.trim(),
+                            date       = selectedDate,
+                            onSuccess  = onBack
+                        )
+                    }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("保存", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    if (isEditMode) "保存修改" else "保存",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
             }
             Spacer(Modifier.height(16.dp))
         }

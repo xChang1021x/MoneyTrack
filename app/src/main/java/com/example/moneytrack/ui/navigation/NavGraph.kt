@@ -117,6 +117,11 @@ fun MoneyTrackNavGraph(repository: MoneyRepository, navPrefs: NavPreferences) {
             }
         }
     ) { innerPadding ->
+
+        fun navigateToEdit(transactionId: Long) {
+            navController.navigate("edit_transaction/$transactionId")
+        }
+
         NavHost(
             navController    = navController,
             startDestination = Screen.Home.route,
@@ -124,16 +129,31 @@ fun MoneyTrackNavGraph(repository: MoneyRepository, navPrefs: NavPreferences) {
         ) {
             composable(Screen.Home.route) {
                 HomeScreen(
-                    factory       = factory,
-                    onAddClick    = { navController.navigate(Screen.Add.route) },
-                    onSearchClick = { navController.navigate(Screen.Search.route) }
+                    factory           = factory,
+                    onAddClick        = { navController.navigate(Screen.Add.route) },
+                    onSearchClick     = { navController.navigate(Screen.Search.route) },
+                    onEditTransaction = { id -> navigateToEdit(id) }
                 )
             }
             composable(Screen.History.route) {
-                HistoryScreen(factory = factory)
+                HistoryScreen(
+                    factory           = factory,
+                    onEditTransaction = { id -> navigateToEdit(id) }
+                )
             }
             composable(Screen.Add.route) {
                 AddTransactionScreen(factory = factory, onBack = { navController.popBackStack() })
+            }
+            composable(
+                route     = "edit_transaction/{transactionId}",
+                arguments = listOf(navArgument("transactionId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val transactionId = backStackEntry.arguments!!.getLong("transactionId")
+                AddTransactionScreen(
+                    factory       = factory,
+                    transactionId = transactionId,
+                    onBack        = { navController.popBackStack() }
+                )
             }
             composable(Screen.Chart.route) {
                 ChartScreen(factory = factory)
@@ -154,7 +174,11 @@ fun MoneyTrackNavGraph(repository: MoneyRepository, navPrefs: NavPreferences) {
                 BudgetScreen(factory = factory, onBack = { navController.popBackStack() })
             }
             composable(Screen.Search.route) {
-                SearchScreen(factory = factory, onBack = { navController.popBackStack() })
+                SearchScreen(
+                    factory           = factory,
+                    onBack            = { navController.popBackStack() },
+                    onEditTransaction = { id -> navigateToEdit(id) }
+                )
             }
             composable(Screen.Debt.route) {
                 DebtScreen(factory = factory, onBack = { navController.popBackStack() })

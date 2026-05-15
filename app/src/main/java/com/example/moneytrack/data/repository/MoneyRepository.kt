@@ -40,6 +40,9 @@ class MoneyRepository(
     fun searchTransactions(keyword: String): Flow<List<TransactionWithCategory>> =
         transactionDao.searchTransactions(keyword)
 
+    suspend fun getTransactionById(id: Long): Transaction? =
+        transactionDao.getTransactionById(id)
+
     suspend fun insertTransaction(transaction: Transaction): Long =
         transactionDao.insertTransaction(transaction)
 

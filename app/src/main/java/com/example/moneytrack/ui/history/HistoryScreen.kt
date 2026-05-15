@@ -30,7 +30,10 @@ import com.example.moneytrack.viewmodel.ViewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(factory: ViewModelFactory) {
+fun HistoryScreen(
+    factory: ViewModelFactory,
+    onEditTransaction: (Long) -> Unit = {}
+) {
     val viewModel: HistoryViewModel = viewModel(factory = factory)
     val allTransactions by viewModel.allTransactions.collectAsStateWithLifecycle()
 
@@ -85,8 +88,9 @@ fun HistoryScreen(factory: ViewModelFactory) {
                             Column(Modifier.padding(vertical = 4.dp)) {
                                 items.forEachIndexed { index, item ->
                                     SwipeToDismissTransactionItem(
-                                        item = item,
-                                        onDismiss = { viewModel.deleteTransaction(item.transaction) }
+                                        item      = item,
+                                        onDismiss = { viewModel.deleteTransaction(item.transaction) },
+                                        onEdit    = { onEditTransaction(item.transaction.id) }
                                     )
                                     if (index < items.lastIndex) {
                                         HorizontalDivider(
@@ -156,7 +160,8 @@ fun DayHeader(date: String, income: Double, expense: Double) {
 @Composable
 fun SwipeToDismissTransactionItem(
     item: TransactionWithCategory,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit = {}
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = {
@@ -190,7 +195,6 @@ fun SwipeToDismissTransactionItem(
             }
         }
     ) {
-        // 内容直接用 TransactionItem（背景透明，Card 背景已由上层 Card 提供）
-        TransactionItem(item = item)
+        TransactionItem(item = item, onClick = onEdit)
     }
 }

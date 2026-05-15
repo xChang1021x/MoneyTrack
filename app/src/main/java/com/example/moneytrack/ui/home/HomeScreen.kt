@@ -1,6 +1,7 @@
 package com.example.moneytrack.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,7 +38,8 @@ import java.util.Calendar
 fun HomeScreen(
     factory: ViewModelFactory,
     onAddClick: () -> Unit,
-    onSearchClick: () -> Unit
+    onSearchClick: () -> Unit,
+    onEditTransaction: (Long) -> Unit = {}
 ) {
     val viewModel: HomeViewModel = viewModel(factory = factory)
     val income  by viewModel.monthlyIncome.collectAsStateWithLifecycle()
@@ -129,7 +131,10 @@ fun HomeScreen(
                     ) {
                         Column(Modifier.padding(vertical = 4.dp)) {
                             recentList.forEachIndexed { index, item ->
-                                TransactionItem(item = item)
+                                TransactionItem(
+                                    item    = item,
+                                    onClick = { onEditTransaction(item.transaction.id) }
+                                )
                                 if (index < recentList.lastIndex) {
                                     HorizontalDivider(
                                         modifier = Modifier.padding(horizontal = 16.dp),
@@ -253,10 +258,13 @@ private fun IncomeExpensePill(
     }
 }
 
-// ─── 账单条目（共用于 Home + History）─────────────────────────────────────
+// ─── 账单条目（共用于 Home / History / Search）────────────────────────────
 
 @Composable
-fun TransactionItem(item: TransactionWithCategory) {
+fun TransactionItem(
+    item: TransactionWithCategory,
+    onClick: (() -> Unit)? = null
+) {
     val t   = item.transaction
     val cat = item.category
     val isExpense = t.type == TransactionType.EXPENSE
@@ -265,6 +273,7 @@ fun TransactionItem(item: TransactionWithCategory) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

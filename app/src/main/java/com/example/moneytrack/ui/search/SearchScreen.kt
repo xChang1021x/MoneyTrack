@@ -24,7 +24,11 @@ import com.example.moneytrack.viewmodel.ViewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(factory: ViewModelFactory, onBack: () -> Unit) {
+fun SearchScreen(
+    factory: ViewModelFactory,
+    onBack: () -> Unit,
+    onEditTransaction: (Long) -> Unit = {}
+) {
     val viewModel: SearchViewModel = viewModel(factory = factory)
     val keyword    by viewModel.keyword.collectAsStateWithLifecycle()
     val filterType by viewModel.filterType.collectAsStateWithLifecycle()
@@ -137,7 +141,10 @@ fun SearchScreen(factory: ViewModelFactory, onBack: () -> Unit) {
                         ) {
                             Column(Modifier.padding(vertical = 4.dp)) {
                                 results.forEachIndexed { index, item ->
-                                    TransactionItem(item = item)
+                                    TransactionItem(
+                                        item    = item,
+                                        onClick = { onEditTransaction(item.transaction.id) }
+                                    )
                                     if (index < results.lastIndex) {
                                         HorizontalDivider(
                                             modifier = Modifier.padding(horizontal = 16.dp),

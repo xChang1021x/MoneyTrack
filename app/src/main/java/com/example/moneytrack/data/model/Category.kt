@@ -11,5 +11,6 @@ data class Category(
     val icon: String,           // Material Icon 名称，如 "restaurant"
     val color: Long,            // ARGB 颜色值
     val type: TransactionType,  // 收入 or 支出分类
-    val isDefault: Boolean = false  // 是否为预置分类（不可删除）
+    val isDefault: Boolean = false, // 是否为预置分类
+    val sortOrder: Int = 0          // 排列顺序（越小越靠前）
 )

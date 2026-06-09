@@ -1,5 +1,6 @@
 package com.example.moneytrack.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -8,8 +9,10 @@ data class Category(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val name: String,
-    val icon: String,           // Material Icon 名称，如 "restaurant"
-    val color: Long,            // ARGB 颜色值
-    val type: TransactionType,  // 收入 or 支出分类
-    val isDefault: Boolean = false  // 是否为预置分类（不可删除）
+    val icon: String,
+    val color: Long,
+    val type: TransactionType,
+    val isDefault: Boolean = false,
+    @ColumnInfo(defaultValue = "0")
+    val sortOrder: Int = 0
 )

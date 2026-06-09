@@ -2,10 +2,12 @@ package com.example.moneytrack.ui.add
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,37 +27,36 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.moneytrack.data.model.Category
+import com.example.moneytrack.data.model.SUPPORTED_CURRENCIES
 import com.example.moneytrack.data.model.TransactionType
+import com.example.moneytrack.data.model.currencySymbol
 import com.example.moneytrack.ui.common.formatDateFull
 import com.example.moneytrack.viewmodel.AddTransactionViewModel
+import com.example.moneytrack.viewmodel.CurrencyViewModel
 import com.example.moneytrack.viewmodel.ViewModelFactory
 
-/**
- * 记账 / 修改账单一体化页面。
- * transactionId == -1L → 新增模式；否则为编辑模式，自动从 DB 预填表单。
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionScreen(
     factory: ViewModelFactory,
+    currencyVm: CurrencyViewModel,
     transactionId: Long = -1L,
     onBack: () -> Unit
 ) {
     val viewModel: AddTransactionViewModel = viewModel(factory = factory)
     val isEditMode = transactionId >= 0L
 
-    // ── 表单状态 ─────────────────────────────────────────────────────────
     var selectedType       by remember { mutableStateOf(TransactionType.EXPENSE) }
     var amountText         by remember { mutableStateOf("") }
     var note               by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
     var selectedDate       by remember { mutableStateOf(System.currentTimeMillis()) }
+    var selectedCurrency   by remember { mutableStateOf(currencyVm.getLastUsedCurrency()) }
     var showDatePicker     by remember { mutableStateOf(false) }
     var amountError        by remember { mutableStateOf(false) }
     var categoryError      by remember { mutableStateOf(false) }
     var showDeleteConfirm  by remember { mutableStateOf(false) }
 
-    // 编辑模式：加载已有账单并预填（只做一次）
     val loadedTransaction by viewModel.loadedTransaction.collectAsStateWithLifecycle()
     var initialized        by remember { mutableStateOf(false) }
 
@@ -73,6 +74,7 @@ fun AddTransactionScreen(
             note               = t.note
             selectedDate       = t.date
             selectedCategoryId = t.categoryId
+            selectedCurrency   = t.currency
             initialized        = true
         }
     }
@@ -81,7 +83,6 @@ fun AddTransactionScreen(
     val incomeCategories  by viewModel.incomeCategories.collectAsStateWithLifecycle()
     val categories = if (selectedType == TransactionType.EXPENSE) expenseCategories else incomeCategories
 
-    // ── 日期选择器 ────────────────────────────────────────────────────────
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDate)
         DatePickerDialog(
@@ -96,7 +97,6 @@ fun AddTransactionScreen(
         ) { DatePicker(state = datePickerState) }
     }
 
-    // ── 删除确认弹窗 ──────────────────────────────────────────────────────
     if (showDeleteConfirm && loadedTransaction != null) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
@@ -143,7 +143,6 @@ fun AddTransactionScreen(
         ) {
             Spacer(Modifier.height(4.dp))
 
-            // ── 收入 / 支出切换（Pill 样式）────────────────────────
             Surface(
                 shape = RoundedCornerShape(50.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -182,7 +181,33 @@ fun AddTransactionScreen(
                 }
             }
 
-            // ── 金额输入 ───────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "货币",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SUPPORTED_CURRENCIES.forEach { cur ->
+                        val isSelected = selectedCurrency == cur.code
+                        FilterChip(
+                            selected = isSelected,
+                            onClick  = { selectedCurrency = cur.code },
+                            label    = {
+                                Text(
+                                    "${cur.symbol} ${cur.code}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+
             OutlinedTextField(
                 value = amountText,
                 onValueChange = {
@@ -190,7 +215,14 @@ fun AddTransactionScreen(
                     amountError = false
                 },
                 label = { Text("金额") },
-                prefix = { Text("¥", style = MaterialTheme.typography.titleMedium) },
+                prefix = {
+                    Text(
+                        currencySymbol(selectedCurrency),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 isError = amountError,
@@ -200,7 +232,6 @@ fun AddTransactionScreen(
                 shape = RoundedCornerShape(16.dp)
             )
 
-            // ── 日期选择 ───────────────────────────────────────────
             OutlinedTextField(
                 value = formatDateFull(selectedDate),
                 onValueChange = {},
@@ -220,7 +251,6 @@ fun AddTransactionScreen(
                 )
             )
 
-            // ── 分类选择 ───────────────────────────────────────────
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -258,7 +288,6 @@ fun AddTransactionScreen(
                 }
             }
 
-            // ── 备注 ───────────────────────────────────────────────
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
@@ -270,12 +299,12 @@ fun AddTransactionScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ── 保存 / 保存修改 按钮 ────────────────────────────────
             Button(
                 onClick = {
                     val amount = amountText.toDoubleOrNull()
                     if (amount == null || amount <= 0) { amountError = true; return@Button }
                     if (selectedCategoryId == null) { categoryError = true; return@Button }
+                    currencyVm.setLastUsedCurrency(selectedCurrency)
                     if (isEditMode && loadedTransaction != null) {
                         viewModel.updateTransaction(
                             original   = loadedTransaction!!,
@@ -284,6 +313,7 @@ fun AddTransactionScreen(
                             categoryId = selectedCategoryId!!,
                             note       = note.trim(),
                             date       = selectedDate,
+                            currency   = selectedCurrency,
                             onSuccess  = onBack
                         )
                     } else {
@@ -293,6 +323,7 @@ fun AddTransactionScreen(
                             categoryId = selectedCategoryId!!,
                             note       = note.trim(),
                             date       = selectedDate,
+                            currency   = selectedCurrency,
                             onSuccess  = onBack
                         )
                     }
@@ -310,8 +341,6 @@ fun AddTransactionScreen(
         }
     }
 }
-
-// ─── 分类图标圆片 ──────────────────────────────────────────────────────────
 
 @Composable
 fun CategoryChip(category: Category, isSelected: Boolean, onClick: () -> Unit) {

@@ -7,18 +7,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import com.example.moneytrack.data.preferences.CurrencyPreferences
 import com.example.moneytrack.data.preferences.NavPreferences
 import com.example.moneytrack.data.repository.MoneyRepository
 import com.example.moneytrack.ui.add.AddTransactionScreen
 import com.example.moneytrack.ui.budget.BudgetScreen
 import com.example.moneytrack.ui.category.CategoryScreen
 import com.example.moneytrack.ui.chart.ChartScreen
+import com.example.moneytrack.ui.currency.CurrencyManageScreen
 import com.example.moneytrack.ui.debt.DebtScreen
 import com.example.moneytrack.ui.history.HistoryScreen
 import com.example.moneytrack.ui.home.HomeScreen
@@ -27,10 +30,9 @@ import com.example.moneytrack.ui.profile.ProfileScreen
 import com.example.moneytrack.ui.search.SearchScreen
 import com.example.moneytrack.ui.split.SplitDetailScreen
 import com.example.moneytrack.ui.split.SplitScreen
+import com.example.moneytrack.viewmodel.CurrencyViewModel
 import com.example.moneytrack.viewmodel.NavViewModel
 import com.example.moneytrack.viewmodel.ViewModelFactory
-
-// ─── 路由常量 ──────────────────────────────────────────────────────────────
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home         : Screen("home",         "首页",     Icons.Default.Home)
@@ -45,9 +47,9 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Split        : Screen("split",        "分账",     Icons.Default.Calculate)
     object SplitDetail  : Screen("split/{groupId}", "分账明细", Icons.Default.Calculate)
     object NavCustomize : Screen("nav_customize","导航设置", Icons.Default.Tune)
+    object CurrencyManage : Screen("currency_manage", "货币管理", Icons.Default.MonetizationOn)
 }
 
-/** route → Screen 映射，用于把偏好路由列表转成 Screen 对象 */
 private val ROUTE_TO_SCREEN = mapOf(
     Screen.Home.route     to Screen.Home,
     Screen.History.route  to Screen.History,
@@ -60,22 +62,22 @@ private val ROUTE_TO_SCREEN = mapOf(
     Screen.Search.route   to Screen.Search,
 )
 
-// ─── NavGraph ──────────────────────────────────────────────────────────────
-
 @Composable
 fun MoneyTrackNavGraph(repository: MoneyRepository, navPrefs: NavPreferences) {
+    val context       = LocalContext.current
     val navController = rememberNavController()
     val factory       = ViewModelFactory(repository)
     val navVm: NavViewModel = viewModel(factory = NavViewModel.Factory(navPrefs))
 
+    val currencyPrefs = remember { CurrencyPreferences(context) }
+    val currencyVm: CurrencyViewModel = viewModel(factory = CurrencyViewModel.Factory(currencyPrefs))
+
     val savedRoutes by navVm.routes.collectAsStateWithLifecycle()
 
-    // 动态底部导航项 = 用户选的项（顺序一致）+ Profile 固定末位
     val dynamicNavItems: List<Screen> = remember(savedRoutes) {
         savedRoutes.mapNotNull { ROUTE_TO_SCREEN[it] } + Screen.Profile
     }
 
-    // 显示底部导航栏的路由集合（Add 是全屏表单，不显示底栏；其余导航项都显示）
     val bottomBarRoutes: Set<String> = remember(dynamicNavItems) {
         dynamicNavItems.map { it.route }.toSet() - Screen.Add.route
     }
@@ -84,23 +86,18 @@ fun MoneyTrackNavGraph(repository: MoneyRepository, navPrefs: NavPreferences) {
         bottomBar = {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
-
-            val showBottomBar = currentRoute in bottomBarRoutes
-            if (showBottomBar) {
+            if (currentRoute in bottomBarRoutes) {
                 NavigationBar {
                     dynamicNavItems.forEach { screen ->
-                        // Split 的子路由也高亮 Split 图标
                         val selected = currentRoute == screen.route ||
                                 (currentRoute?.startsWith(screen.route + "/") == true)
                         NavigationBarItem(
-                            icon  = { Icon(screen.icon, contentDescription = screen.label) },
-                            label = { Text(screen.label) },
+                            icon     = { Icon(screen.icon, screen.label) },
+                            label    = { Text(screen.label) },
                             selected = selected,
-                            onClick = {
+                            onClick  = {
                                 if (screen == Screen.Add) {
-                                    navController.navigate(Screen.Add.route) {
-                                        launchSingleTop = true
-                                    }
+                                    navController.navigate(Screen.Add.route) { launchSingleTop = true }
                                 } else {
                                     navController.navigate(screen.route) {
                                         popUpTo(navController.graph.findStartDestination().id) {
@@ -130,6 +127,7 @@ fun MoneyTrackNavGraph(repository: MoneyRepository, navPrefs: NavPreferences) {
             composable(Screen.Home.route) {
                 HomeScreen(
                     factory           = factory,
+                    currencyVm        = currencyVm,
                     onAddClick        = { navController.navigate(Screen.Add.route) },
                     onSearchClick     = { navController.navigate(Screen.Search.route) },
                     onEditTransaction = { id -> navigateToEdit(id) }
@@ -142,7 +140,11 @@ fun MoneyTrackNavGraph(repository: MoneyRepository, navPrefs: NavPreferences) {
                 )
             }
             composable(Screen.Add.route) {
-                AddTransactionScreen(factory = factory, onBack = { navController.popBackStack() })
+                AddTransactionScreen(
+                    factory    = factory,
+                    currencyVm = currencyVm,
+                    onBack     = { navController.popBackStack() }
+                )
             }
             composable(
                 route     = "edit_transaction/{transactionId}",
@@ -151,20 +153,22 @@ fun MoneyTrackNavGraph(repository: MoneyRepository, navPrefs: NavPreferences) {
                 val transactionId = backStackEntry.arguments!!.getLong("transactionId")
                 AddTransactionScreen(
                     factory       = factory,
+                    currencyVm    = currencyVm,
                     transactionId = transactionId,
                     onBack        = { navController.popBackStack() }
                 )
             }
             composable(Screen.Chart.route) {
-                ChartScreen(factory = factory)
+                ChartScreen(factory = factory, currencyVm = currencyVm)
             }
             composable(Screen.Profile.route) {
                 ProfileScreen(
-                    onCategoryClick    = { navController.navigate(Screen.Category.route) },
-                    onBudgetClick      = { navController.navigate(Screen.Budget.route) },
-                    onDebtClick        = { navController.navigate(Screen.Debt.route) },
-                    onSplitClick       = { navController.navigate(Screen.Split.route) },
-                    onNavCustomizeClick = { navController.navigate(Screen.NavCustomize.route) }
+                    onCategoryClick      = { navController.navigate(Screen.Category.route) },
+                    onBudgetClick        = { navController.navigate(Screen.Budget.route) },
+                    onDebtClick          = { navController.navigate(Screen.Debt.route) },
+                    onSplitClick         = { navController.navigate(Screen.Split.route) },
+                    onNavCustomizeClick  = { navController.navigate(Screen.NavCustomize.route) },
+                    onCurrencyManageClick = { navController.navigate(Screen.CurrencyManage.route) }
                 )
             }
             composable(Screen.Category.route) {
@@ -203,6 +207,12 @@ fun MoneyTrackNavGraph(repository: MoneyRepository, navPrefs: NavPreferences) {
             }
             composable(Screen.NavCustomize.route) {
                 NavCustomizeScreen(navVm = navVm, onBack = { navController.popBackStack() })
+            }
+            composable(Screen.CurrencyManage.route) {
+                CurrencyManageScreen(
+                    currencyVm = currencyVm,
+                    onBack     = { navController.popBackStack() }
+                )
             }
         }
     }

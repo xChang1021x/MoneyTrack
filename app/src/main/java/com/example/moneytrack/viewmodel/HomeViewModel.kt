@@ -24,6 +24,10 @@ class HomeViewModel(private val repository: MoneyRepository) : ViewModel() {
         endOfMonth = cal.timeInMillis
     }
 
+    val allMonthlyTransactions: StateFlow<List<TransactionWithCategory>> =
+        repository.getTransactionsByDateRange(startOfMonth, endOfMonth)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val recentTransactions: StateFlow<List<TransactionWithCategory>> =
         repository.getTransactionsByDateRange(startOfMonth, endOfMonth)
             .map { it.take(20) }

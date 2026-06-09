@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 @Database(
     entities = [Transaction::class, Category::class, Budget::class,
                 Debt::class, SplitGroup::class, SplitItem::class],
-    version = 3,
+    version = 5,
     exportSchema = true,
     autoMigrations = [AutoMigration(from = 1, to = 2)]
 )
@@ -45,12 +45,47 @@ abstract class MoneyTrackDatabase : RoomDatabase() {
             }
         }
 
-        /** v2 → v3：split_group 新增 participants 列 */
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE split_group ADD COLUMN participants TEXT NOT NULL DEFAULT ''"
                 )
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE transactions ADD COLUMN currency TEXT NOT NULL DEFAULT 'CNY'"
+                )
+            }
+        }
+
+        // v4 -> v5: brings the schema in line with whatever state the v4 database
+        // is in. Different v4 builds may have landed different subsets of columns,
+        // so we check each one before adding it.
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                ensureColumn(db, "transactions", "currency",
+                    "ALTER TABLE transactions ADD COLUMN currency TEXT NOT NULL DEFAULT 'CNY'")
+                ensureColumn(db, "categories", "sortOrder",
+                    "ALTER TABLE categories ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0")
+            }
+
+            private fun ensureColumn(
+                db: SupportSQLiteDatabase,
+                table: String,
+                column: String,
+                addSql: String
+            ) {
+                val cursor = db.query("PRAGMA table_info($table)")
+                var found = false
+                while (cursor.moveToNext()) {
+                    val idx = cursor.getColumnIndex("name")
+                    if (idx != -1 && cursor.getString(idx) == column) { found = true; break }
+                }
+                cursor.close()
+                if (!found) db.execSQL(addSql)
             }
         }
 
@@ -60,11 +95,10 @@ abstract class MoneyTrackDatabase : RoomDatabase() {
                 MoneyTrackDatabase::class.java,
                 "moneytrack.db"
             )
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
-                        // 首次创建时在后台插入预置分类
                         CoroutineScope(Dispatchers.IO).launch {
                             getInstance(context).categoryDao()
                                 .insertCategories(DEFAULT_CATEGORIES)
@@ -74,9 +108,7 @@ abstract class MoneyTrackDatabase : RoomDatabase() {
                 .build()
         }
 
-        // 预置分类
         val DEFAULT_CATEGORIES = listOf(
-            // 支出分类
             Category(name = "餐饮", icon = "restaurant", color = 0xFFEF5350, type = TransactionType.EXPENSE, isDefault = true),
             Category(name = "交通", icon = "directions_car", color = 0xFF42A5F5, type = TransactionType.EXPENSE, isDefault = true),
             Category(name = "购物", icon = "shopping_bag", color = 0xFFAB47BC, type = TransactionType.EXPENSE, isDefault = true),
@@ -85,7 +117,6 @@ abstract class MoneyTrackDatabase : RoomDatabase() {
             Category(name = "医疗", icon = "local_hospital", color = 0xFF66BB6A, type = TransactionType.EXPENSE, isDefault = true),
             Category(name = "教育", icon = "school", color = 0xFFFFCA28, type = TransactionType.EXPENSE, isDefault = true),
             Category(name = "其他支出", icon = "more_horiz", color = 0xFF78909C, type = TransactionType.EXPENSE, isDefault = true),
-            // 收入分类
             Category(name = "工资", icon = "payments", color = 0xFF4CAF50, type = TransactionType.INCOME, isDefault = true),
             Category(name = "奖金", icon = "card_giftcard", color = 0xFFFFB300, type = TransactionType.INCOME, isDefault = true),
             Category(name = "理财", icon = "trending_up", color = 0xFF29B6F6, type = TransactionType.INCOME, isDefault = true),

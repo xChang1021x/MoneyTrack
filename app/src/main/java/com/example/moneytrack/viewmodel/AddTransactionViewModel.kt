@@ -36,12 +36,14 @@ class AddTransactionViewModel(private val repository: MoneyRepository) : ViewMod
         categoryId: Long,
         note: String,
         date: Long,
+        currency: String = "CNY",
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
             repository.insertTransaction(
                 Transaction(amount = amount, type = type,
-                            categoryId = categoryId, note = note, date = date)
+                            categoryId = categoryId, note = note, date = date,
+                            currency = currency)
             )
             onSuccess()
         }
@@ -55,12 +57,14 @@ class AddTransactionViewModel(private val repository: MoneyRepository) : ViewMod
         categoryId: Long,
         note: String,
         date: Long,
+        currency: String = "CNY",
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
             repository.updateTransaction(
                 original.copy(amount = amount, type = type,
-                              categoryId = categoryId, note = note, date = date)
+                              categoryId = categoryId, note = note, date = date,
+                              currency = currency)
             )
             onSuccess()
         }
